@@ -1,17 +1,44 @@
 const std = @import("std");
 
+const mmanager = @import("mlist.zig");
+
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+    const alloc = gpa.allocator();
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    var list = try mmanager.mList(i32, .{
+        .allow_out_of_bounds_indexing = true,
+    }).init(alloc);
+    defer list.deinit();
 
-    try bw.flush(); // don't forget to flush!
+    _ = try list.append(32);
+    std.log.debug("Slice: {any}", .{list.slice});
+
+    _ = try list.append(320);
+    std.log.debug("Slice: {any}", .{list.slice});
+
+    for (0..80) |x| {
+        _ = try list.append(@intCast(x));
+
+        if (x > 20) {
+            const rm = std.crypto.random.intRangeLessThan(
+                usize,
+                0,
+                list.len(),
+            );
+            try list.remove(rm);
+        }
+
+        std.log.debug("Slice: {any}", .{list.slice});
+    }
+
+    if (list.getPtr(10)) |p| {
+        p.* = 4444;
+    }
+
+    try list.remove(1);
+    try list.remove(2);
+    std.log.debug("Slice: {any}", .{list.slice});
 }
